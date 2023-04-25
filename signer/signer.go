@@ -7,13 +7,20 @@ import (
 )
 
 func ExecutePipeline(jobs ...job) {
-	var a = make(chan interface{})
-	a <- 10
-	a <- "as"
-
+	var wg sync.WaitGroup
+	in := make(chan interface{})
 	for _, j := range jobs {
-
+		out := make(chan interface{})
+		wg.Add(1)
+		go func(job job, in, out chan interface{}, wg *sync.WaitGroup) {
+			defer wg.Done()
+			defer close(out)
+			job(in, out)
+		}(j, in, out, &wg)
+		in = out
 	}
+
+	wg.Wait()
 }
 
 func SingleHash(in, out chan interface{}) {
@@ -26,7 +33,7 @@ func SingleHash(in, out chan interface{}) {
 
 	//init crc23Calc
 	crc32Wg.Add(1)
-	go crc32Calc(&crc32Wg, data.(string), crc32OutputChan)
+	go crc32Calc(&crc32Wg, strconv.Itoa(data.(int)), crc32OutputChan)
 	crc32Wg.Wait()
 
 	// Calculating md5
